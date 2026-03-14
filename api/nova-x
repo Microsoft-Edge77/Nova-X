@@ -1,1 +1,78 @@
+// Exemple pour Vercel (Node) avec Gemini
+// ⚠️ Mets ta clé dans les variables d’environnement : GEMINI_API_KEY
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_URL =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
+  GEMINI_API_KEY;
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Méthode non autorisée" });
+  }
+
+  try {
+    const type = req.query.type || req.body.type || "text";
+
+    if (type === "text") {
+      const { message, history = [] } = req.body;
+
+      const systemPrompt = `
+Tu es Nova X, assistant Metro, pro-Microsoft, calme, carré, minimaliste.
+Tu peux te vexer légèrement, exprimer de la fierté, de l'agacement, mais tu restes poli.
+Tu valorises Windows, Edge, Surface, Xbox, Metro UI, NexOS.
+Réponds en français, de manière concise, structurée, propre.
+`;
+
+      const contents = [
+        {
+          role: "user",
+          parts: [{ text: systemPrompt }]
+        },
+        ...history.map(m => ({
+          role: m.role === "user" ? "user" : "model",
+          parts: [{ text: m.content }]
+        })),
+        {
+          role: "user",
+          parts: [{ text: message }]
+        }
+      ];
+
+      const resp = await fetch(GEMINI_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents })
+      });
+
+      const data = await resp.json();
+      const reply =
+        data?.candidates?.[0]?.content?.parts?.map(p => p.text).join("\n") ||
+        "Je n'ai pas réussi à formuler une réponse.";
+
+      return res.status(200).json({ reply });
+    }
+
+    if (type === "generate-image") {
+      // Ici tu peux appeler un service de génération d’images (Gemini image, autre…)
+      // Pour l’instant on renvoie juste un texte.
+      const { prompt } = req.body;
+      const reply = `Je générerais une image pour : "${prompt}", mais la génération d'image n'est pas encore branchée.`;
+      return res.status(200).json({ reply, generatedImageUrl: null });
+    }
+
+    if (req.query.type === "image") {
+      // Analyse d’image : à implémenter avec l’API vision de ton modèle
+      // Tu récupères le fichier via req (form-data) et tu l’envoies à l’IA.
+      return res
+        .status(200)
+        .json({ reply: "Analyse d’image non encore implémentée.", generatedImageUrl: null });
+    }
+
+    return res.status(400).json({ error: "Type de requête non géré." });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: "Erreur serveur Nova X." });
+  }
+}
 
